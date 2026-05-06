@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.env
+caddy_data/
+caddy_config/
+.venv/
+oauth_state/
