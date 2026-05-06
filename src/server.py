@@ -86,7 +86,7 @@ if OIDC_ENABLED:
         client_secret=_OIDC_CLIENT_SECRET or None,
         base_url=_OIDC_BASE_URL,
         jwt_signing_key=_JWT_SIGNING_KEY,
-        required_scopes=[],
+        required_scopes=["openid"],
         client_storage=_client_storage,
     )
     mcp = FastMCP(name="Shark-no-Tegami", instructions=_INSTRUCTIONS, auth=_auth)
