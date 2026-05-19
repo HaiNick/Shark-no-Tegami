@@ -61,11 +61,12 @@ if not MAIL_FROM:
     raise RuntimeError("MAIL_FROM env var is required")
 
 _INSTRUCTIONS = (
-    "Shark-no-Tegami is an email sending tool. Use it to send plain-text emails via a configured Postfix relay.\n\n"
+    "Shark-no-Tegami is an email sending tool. Use it to send plain-text or HTML emails via a configured Postfix relay.\n\n"
     "Tool:\n"
     "- send_email: Send an email to one or more recipients.\n\n"
     "Notes:\n"
-    "- body is plain text only (no HTML)\n"
+    "- body is plain text or HTML depending on content_type\n"
+    "- content_type: 'plain' (default) or 'html'\n"
     "- to supports comma-separated recipients (e.g. 'a@example.com,b@example.com')\n"
     "- Used for automated digest and alert emails from Claude Code Routines"
 )
@@ -100,18 +101,22 @@ else:
 
 
 @mcp.tool()
-async def send_email(to: str, subject: str, body: str) -> str:
+async def send_email(to: str, subject: str, body: str, content_type: str = "plain") -> str:
     """
     Send an email via the configured Postfix relay.
 
     Args:
         to: Recipient email address or comma-separated list of addresses.
+
         subject: Email subject line.
-        body: Plain text email body.
+
+        body: Plain text or HTML email body.
+
+        content_type: Either "plain" (default) or "html".
     """
     recipients = [addr.strip() for addr in to.split(",") if addr.strip()]
 
-    msg = MIMEText(body, "plain", "utf-8")
+    msg = MIMEText(body, content_type, "utf-8")
     msg["From"] = MAIL_FROM
     msg["To"] = ", ".join(recipients)
     msg["Subject"] = subject
