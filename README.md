@@ -6,6 +6,19 @@ Reference implementation: [Shark-no-Kari](https://github.com/HaiNick/Shark-no-Ka
 
 ---
 
+## Tool: `send_email`
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `to` | string | **yes** | Recipient address or comma-separated list |
+| `subject` | string | **yes** | Email subject line |
+| `body` | string | **yes** | Plain-text or HTML body |
+| `content_type` | string | no (default `plain`) | `plain` or `html` |
+| `cc` | string | no | CC addresses, comma-separated |
+| `bcc` | string | no | BCC addresses, comma-separated — passed to the SMTP relay but never added to message headers |
+
+---
+
 ## Environment variables
 
 | Variable | Required | Default | Description |
