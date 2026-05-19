@@ -142,6 +142,8 @@ async def send_email(
             hostname=SMTP_HOST,
             port=SMTP_PORT,
             recipients=all_recipients,
+            use_tls=False,
+            start_tls=False,
         )
         return f"Email sent successfully to {', '.join(all_recipients)}"
     except Exception as e:
