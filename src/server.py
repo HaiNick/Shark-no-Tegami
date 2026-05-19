@@ -68,6 +68,7 @@ _INSTRUCTIONS = (
     "- body is plain text or HTML depending on content_type\n"
     "- content_type: 'plain' (default) or 'html'\n"
     "- to supports comma-separated recipients (e.g. 'a@example.com,b@example.com')\n"
+    "- cc and bcc are optional comma-separated address lists\n"
     "- Used for automated digest and alert emails from Claude Code Routines"
 )
 
@@ -101,36 +102,48 @@ else:
 
 
 @mcp.tool()
-async def send_email(to: str, subject: str, body: str, content_type: str = "plain") -> str:
+async def send_email(
+    to: str,
+    subject: str,
+    body: str,
+    content_type: str = "plain",
+    cc: str = "",
+    bcc: str = "",
+) -> str:
     """
     Send an email via the configured Postfix relay.
 
     Args:
         to: Recipient email address or comma-separated list of addresses.
-
         subject: Email subject line.
-
         body: Plain text or HTML email body.
-
         content_type: Either "plain" (default) or "html".
+        cc: Optional CC addresses, comma-separated.
+        bcc: Optional BCC addresses, comma-separated.
     """
     recipients = [addr.strip() for addr in to.split(",") if addr.strip()]
+    cc_list = [addr.strip() for addr in cc.split(",") if addr.strip()]
+    bcc_list = [addr.strip() for addr in bcc.split(",") if addr.strip()]
 
     msg = MIMEText(body, content_type, "utf-8")
     msg["From"] = MAIL_FROM
     msg["To"] = ", ".join(recipients)
     msg["Subject"] = subject
+    if cc_list:
+        msg["Cc"] = ", ".join(cc_list)
+    # BCC is intentionally not added to headers -- just included in recipients
 
-    logger.info(f"send_email: to={recipients} subject={subject!r}")
+    all_recipients = recipients + cc_list + bcc_list
+
+    logger.info(f"send_email: to={recipients} cc={cc_list} bcc={bcc_list} subject={subject!r}")
     try:
         await aiosmtplib.send(
             msg,
             hostname=SMTP_HOST,
             port=SMTP_PORT,
-            use_tls=False,
-            start_tls=False,
+            recipients=all_recipients,
         )
-        return f"Email sent successfully to {', '.join(recipients)}"
+        return f"Email sent successfully to {', '.join(all_recipients)}"
     except Exception as e:
         logger.error(f"send_email failed: {e}")
         return f"Failed to send email: {e}"
