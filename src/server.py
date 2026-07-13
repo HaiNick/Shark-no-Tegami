@@ -35,8 +35,6 @@ _OIDC_CLIENT_ID = os.getenv("OIDC_CLIENT_ID", "")
 _OIDC_CLIENT_SECRET = os.getenv("OIDC_CLIENT_SECRET", "")
 _OIDC_BASE_URL = os.getenv("OIDC_BASE_URL", "")
 _JWT_SIGNING_KEY = os.getenv("JWT_SIGNING_KEY", "")
-_STORAGE_ENCRYPTION_KEY = os.getenv("STORAGE_ENCRYPTION_KEY", "")
-
 if OIDC_ENABLED:
     _missing = [
         name
@@ -45,7 +43,6 @@ if OIDC_ENABLED:
             ("OIDC_CLIENT_ID", _OIDC_CLIENT_ID),
             ("OIDC_BASE_URL", _OIDC_BASE_URL),
             ("JWT_SIGNING_KEY", _JWT_SIGNING_KEY),
-            ("STORAGE_ENCRYPTION_KEY", _STORAGE_ENCRYPTION_KEY),
         ]
         if not val
     ]
@@ -74,14 +71,16 @@ _INSTRUCTIONS = (
 
 if OIDC_ENABLED:
     from fastmcp.server.auth.oidc_proxy import OIDCProxy
-    from key_value.aio.stores.filetree.store import FileTreeStore
-    from key_value.aio.wrappers.encryption.fernet import FernetEncryptionWrapper
-    from cryptography.fernet import Fernet
 
-    _client_storage = FernetEncryptionWrapper(
-        key_value=FileTreeStore(data_directory="/app/oauth_state"),
-        fernet=Fernet(_STORAGE_ENCRYPTION_KEY),
-    )
+    # 2026-07-13: Removed FileTreeStore-based client_storage (and py-key-value-aio /
+    # cryptography deps + STORAGE_ENCRYPTION_KEY env var).  Two reasons drove this:
+    #   1. Pocket ID 2.10 (fosite migration) rejects the RFC 8707 `resource` parameter
+    #      that OIDCProxy forwards upstream → fixed by forward_resource=False.
+    #   2. Claude.ai registers via CIMD (client_id is a URL).  FileTreeStore uses the
+    #      client_id as a filesystem path component, which crashes on URL-shaped keys
+    #      with a 500 on /authorize.  Fleet-wide decision: use FastMCP's default
+    #      in-memory client storage instead.  Trade-off: container restart requires
+    #      re-authentication (acceptable for this workload).
     _auth = OIDCProxy(
         config_url=_OIDC_CONFIG_URL,
         client_id=_OIDC_CLIENT_ID,
@@ -90,7 +89,7 @@ if OIDC_ENABLED:
         jwt_signing_key=_JWT_SIGNING_KEY,
         required_scopes=["openid"],
         verify_id_token=True,
-        client_storage=_client_storage,
+        forward_resource=False,
     )
     mcp = FastMCP(name="Shark-no-Tegami", instructions=_INSTRUCTIONS, auth=_auth)
 else:

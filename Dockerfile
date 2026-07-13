@@ -11,9 +11,6 @@ COPY src/ ./src/
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -sf -X POST http://localhost:8000/mcp \
-        -H "Content-Type: application/json" \
-        -H "Accept: application/json, text/event-stream" \
-        -d '{"jsonrpc":"2.0","id":0,"method":"ping","params":{}}' || exit 1
+    CMD python -c "import urllib.request,sys; r=urllib.request.urlopen('http://localhost:8000/.well-known/oauth-protected-resource'); sys.exit(0 if r.status==200 else 1)"
 
 CMD ["python", "src/server.py"]

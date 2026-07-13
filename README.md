@@ -32,7 +32,6 @@ Reference implementation: [Shark-no-Kari](https://github.com/HaiNick/Shark-no-Ka
 | `OIDC_CLIENT_SECRET` | if OIDC | — | OIDC client secret (optional) |
 | `OIDC_BASE_URL` | if OIDC | — | Public base URL of this server |
 | `JWT_SIGNING_KEY` | if OIDC | — | Key used to sign session JWTs |
-| `STORAGE_ENCRYPTION_KEY` | if OIDC | — | Fernet key for OAuth state storage |
 | `MCP_API_KEY` | no | — | Bearer token for simple auth (mutually exclusive with `OIDC_ENABLED`) |
 
 ---
@@ -55,14 +54,8 @@ services:
       OIDC_CLIENT_ID: shark-no-tegami
       OIDC_BASE_URL: https://tegami.example.com
       JWT_SIGNING_KEY: ${JWT_SIGNING_KEY}
-      STORAGE_ENCRYPTION_KEY: ${STORAGE_ENCRYPTION_KEY}
-    volumes:
-      - oauth_state:/app/oauth_state
     ports:
       - "8000:8000"
-
-volumes:
-  oauth_state:
 ```
 
 ### Caddyfile
