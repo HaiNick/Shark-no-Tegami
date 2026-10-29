@@ -1,0 +1,7 @@
+sections:
+  - { key: security, label: "Security",              stat: "Security", chip: "security items", color: "#a32d2d" }
+  - { key: kev,      label: "New KEV entries",       stat: "KEV",      chip: "new KEV",        color: "#d85a30" }
+  - { key: releases, label: "Releases",              stat: "Releases", chip: "releases",       color: "#0f6e56" }
+  - { key: homelab,  label: "Homelab & open source", stat: "Homelab",  chip: "homelab picks",  color: "#534ab7" }
+  - { key: tech,     label: "Tech & Maker",          stat: "Tech",     chip: "tech picks",     color: "#0e7a8a" }
+  - { key: ai,       label: "AI & Tooling",          stat: "AI",       chip: "AI picks",       color: "#8a4af3" }
