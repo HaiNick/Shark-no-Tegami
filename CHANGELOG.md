@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.3.0] - 2026-10-29
+
+### Tegami v2: Markdown, `body_ref`, and content validation
+
+- **`send_email` returns JSON.** Success is `{"status": "sent", ...}`; errors are
+  `{"status": "error", "code": "E_...", ...}` results, not exceptions.
+- **`body_ref`**: fetch the body from `OWNER/REPO@SHA40:PATH` through the GitHub
+  contents API, restricted by `TEGAMI_REF_ALLOWLIST`, with a streamed size cap.
+- **`content_type: markdown`** with `theme: default` (CommonMark, `nh3`, inlined
+  CSS) or `theme: shimbun` (vendored `shimbun_lib.py` from the `shimbun-digest`
+  skill, per-section `items` counts).
+- **Content validator** (`src/tegami/validate.py`, Lexbor-based) runs on caller
+  HTML and on every rendered message. Violations return `E_UNSAFE_CONTENT`.
+- **`dry_run`** validates and renders without sending.
+- **Recipient allowlist** (`TEGAMI_ALLOWED_RECIPIENTS`) for `to`, `cc`, and `bcc`.
+- **Subject checks**: CR or LF and subjects over 200 characters are rejected.
+- **Messages are `multipart/alternative`** with `Message-ID` and `Date`.
+- **Logging is metadata only**: one line per call; recipients and subject are
+  no longer logged.
+- **Uvicorn trusts proxy headers** (`proxy_headers=True`, `forwarded_allow_ips="*"`)
+  behind Caddy. OIDC config is unchanged.
+- New dependencies: `httpx`, `nh3`, `markdown-it-py`, `selectolax` (0.3.x),
+  `css-inline`, `pyyaml`. New env vars: `TEGAMI_ALLOWED_RECIPIENTS`,
+  `TEGAMI_REF_ALLOWLIST`, `TEGAMI_GITHUB_TOKEN`, `TEGAMI_MAX_BODY_BYTES`,
+  `TEGAMI_REF_TIMEOUT_S`.
+
 ## [0.2.0] - 2026-07-14
 
 ### Fix: Pocket ID 2.10 / FastMCP 3.x compatibility (2026-07-13 incident)
