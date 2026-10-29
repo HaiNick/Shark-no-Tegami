@@ -22,6 +22,10 @@ def find_violations(html: str, trusted_template: bool = False) -> list[str]:
     tree = LexborHTMLParser(html)
     for node in tree.root.traverse(include_text=False):
         tag = node.tag
+        if tag.startswith("-"):
+            # Comment and other non-element nodes have no attributes, and reading
+            # .attributes on them segfaults selectolax 0.3.x depending on heap state.
+            continue
         if tag in BLOCKED_TAGS:
             if trusted_template and tag == "meta" and "http-equiv" not in (node.attributes or {}):
                 continue  # the theme's own charset/viewport meta tags
