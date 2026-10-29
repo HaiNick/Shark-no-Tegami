@@ -21,6 +21,10 @@
   no longer logged.
 - **Uvicorn trusts proxy headers** (`proxy_headers=True`, `forwarded_allow_ips="*"`)
   behind Caddy. OIDC config is unchanged.
+- **Healthcheck probes `/.well-known/oauth-protected-resource/mcp` first.** FastMCP
+  4.x (which `fastmcp>=3.4.4` resolves to) serves RFC 9728 metadata at the
+  path-suffixed URL, so a fresh build of 0.2.0 reported unhealthy. The bare path
+  stays as a fallback for 3.x.
 - New dependencies: `httpx`, `nh3`, `markdown-it-py`, `selectolax` (0.3.x),
   `css-inline`, `pyyaml`. New env vars: `TEGAMI_ALLOWED_RECIPIENTS`,
   `TEGAMI_REF_ALLOWLIST`, `TEGAMI_GITHUB_TOKEN`, `TEGAMI_MAX_BODY_BYTES`,
