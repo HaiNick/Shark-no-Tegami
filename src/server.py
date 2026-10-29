@@ -5,18 +5,23 @@ Exposes a send_email tool so Claude can send emails via a Postfix relay over Tai
 
 import os
 import logging
+import sys
 import tomllib
-from email.mime.text import MIMEText
 from pathlib import Path
 
-import aiosmtplib
 from fastmcp import FastMCP
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from tegami.config import load_config  # noqa: E402
+from tegami.pipeline import Relay, Request, process  # noqa: E402
 
 with open(Path(__file__).resolve().parent.parent / "pyproject.toml", "rb") as f:
     __version__ = tomllib.load(f)["project"]["version"]
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("shark-no-tegami")
+# httpx logs request URLs at INFO; Tegami writes its own metadata line instead.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 # ---------------------------------------------------------------------------
 # Server setup
@@ -57,15 +62,29 @@ MAIL_FROM = os.getenv("MAIL_FROM", "")
 if not MAIL_FROM:
     raise RuntimeError("MAIL_FROM env var is required")
 
+TEGAMI = load_config()
+RELAY = Relay(mail_from=MAIL_FROM, host=SMTP_HOST, port=SMTP_PORT)
+
 _INSTRUCTIONS = (
-    "Shark-no-Tegami is an email sending tool. Use it to send plain-text or HTML emails via a configured Postfix relay.\n\n"
+    "Shark-no-Tegami is an email sending tool. Use it to send plain-text, HTML, or Markdown emails via a configured Postfix relay.\n\n"
     "Tool:\n"
-    "- send_email: Send an email to one or more recipients.\n\n"
-    "Notes:\n"
-    "- body is plain text or HTML depending on content_type\n"
-    "- content_type: 'plain' (default) or 'html'\n"
-    "- to supports comma-separated recipients (e.g. 'a@example.com,b@example.com')\n"
-    "- cc and bcc are optional comma-separated address lists\n"
+    "- send_email: Send an email to one or more recipients. Returns a JSON object.\n\n"
+    "Body:\n"
+    "- Pass exactly one of body (inline text) or body_ref ('OWNER/REPO@SHA40:PATH', a file at a full 40-char commit SHA in an allowlisted repo and path prefix; .md, .html, or .txt)\n"
+    "- content_type: 'plain' (default), 'html', or 'markdown'\n"
+    "- theme (markdown only): 'default' (default) or 'shimbun' (strict Shark-no-Shimbun digest dialect; result includes per-section 'items' counts)\n"
+    "- HTML bodies and all rendered output are checked for active content (scripts, event handlers, non-http(s)/mailto URLs, blocked CSS, forms, embeds) and rejected if any is found\n"
+    "- dry_run: true resolves, validates, and renders without sending; status is 'validated' and html_preview holds the first 500 characters\n\n"
+    "Recipients and subject:\n"
+    "- to, cc, bcc: comma-separated addresses (e.g. 'a@example.com,b@example.com'); all must be on the server's recipient allowlist when one is configured\n"
+    "- subject: max 200 characters, no CR or LF\n\n"
+    "Results:\n"
+    "- Success: {status: 'sent' | 'validated', message_id, source, source_sha256, html_bytes, items?, html_preview?}\n"
+    "- Error: {status: 'error', code, message, details?}. Branch on code:\n"
+    "  E_ARGS (bad or conflicting arguments), E_RECIPIENT (address not allowlisted), E_REF_FORMAT (malformed body_ref),\n"
+    "  E_REF_NOT_ALLOWED (repo or path not allowlisted), E_REF_FETCH (GitHub error, timeout, or non-UTF-8 content),\n"
+    "  E_TOO_LARGE (body over the byte limit), E_UNSAFE_CONTENT (details lists violations),\n"
+    "  E_THEME_PARSE (digest does not match the Shimbun dialect; message starts with 'line N:'), E_SMTP (relay refused or timed out)\n\n"
     "- Used for automated digest and alert emails from Claude Code Routines"
 )
 
@@ -104,50 +123,44 @@ else:
 async def send_email(
     to: str,
     subject: str,
-    body: str,
+    body: str | None = None,
     content_type: str = "plain",
     cc: str = "",
     bcc: str = "",
-) -> str:
+    body_ref: str | None = None,
+    theme: str | None = None,
+    dry_run: bool = False,
+) -> dict:
     """
-    Send an email via the configured Postfix relay.
+    Send an email via the configured Postfix relay. Returns a JSON result; errors
+    come back as {"status": "error", "code": ...} rather than exceptions.
 
     Args:
-        to: Recipient email address or comma-separated list of addresses.
-        subject: Email subject line.
-        body: Plain text or HTML email body.
-        content_type: Either "plain" (default) or "html".
+        to: Recipient address or comma-separated list. Must be allowlisted if the server has an allowlist.
+        subject: Subject line. Max 200 characters, no CR or LF.
+        body: Inline body. Pass exactly one of body and body_ref.
+        content_type: "plain" (default), "html", or "markdown". HTML is checked for active content.
         cc: Optional CC addresses, comma-separated.
-        bcc: Optional BCC addresses, comma-separated.
+        bcc: Optional BCC addresses, comma-separated. Never added to headers.
+        body_ref: "OWNER/REPO@SHA40:PATH" to fetch the body from an allowlisted GitHub repo and path prefix.
+        theme: Only with markdown: "default" (default) or "shimbun".
+        dry_run: Resolve, validate, and render, then return stats and an HTML preview without sending.
+
+    Error codes: E_ARGS, E_RECIPIENT, E_REF_FORMAT, E_REF_NOT_ALLOWED, E_REF_FETCH,
+    E_TOO_LARGE, E_UNSAFE_CONTENT, E_THEME_PARSE, E_SMTP.
     """
-    recipients = [addr.strip() for addr in to.split(",") if addr.strip()]
-    cc_list = [addr.strip() for addr in cc.split(",") if addr.strip()]
-    bcc_list = [addr.strip() for addr in bcc.split(",") if addr.strip()]
-
-    msg = MIMEText(body, content_type, "utf-8")
-    msg["From"] = MAIL_FROM
-    msg["To"] = ", ".join(recipients)
-    msg["Subject"] = subject
-    if cc_list:
-        msg["Cc"] = ", ".join(cc_list)
-    # BCC is intentionally not added to headers -- just included in recipients
-
-    all_recipients = recipients + cc_list + bcc_list
-
-    logger.info(f"send_email: to={recipients} cc={cc_list} bcc={bcc_list} subject={subject!r}")
-    try:
-        await aiosmtplib.send(
-            msg,
-            hostname=SMTP_HOST,
-            port=SMTP_PORT,
-            recipients=all_recipients,
-            use_tls=False,
-            start_tls=False,
-        )
-        return f"Email sent successfully to {', '.join(all_recipients)}"
-    except Exception as e:
-        logger.error(f"send_email failed: {e}")
-        return f"Failed to send email: {e}"
+    req = Request(
+        to=to,
+        subject=subject,
+        body=body,
+        body_ref=body_ref,
+        content_type=content_type,
+        theme=theme,
+        cc=cc,
+        bcc=bcc,
+        dry_run=dry_run,
+    )
+    return await process(req, TEGAMI, RELAY)
 
 
 # ---------------------------------------------------------------------------
