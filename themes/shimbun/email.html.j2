@@ -1,0 +1,95 @@
+{#- Shark-no-Shimbun email. Context: digest, sections, stats, theme, cutoff_display, footer. -#}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ digest.title }} {{ digest.issue }}</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f2;font-family:Arial,Helvetica,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f4f2;padding:24px 0">
+<tr><td align="center">
+<table width="640" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;border:1px solid #e8e8e6">
+
+{# Header: title, date range, and per-section counts #}
+<tr><td style="padding:20px;border-bottom:1px solid #eee"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td><div style="font-size:14px;font-weight:bold;color:#1a1a1a">{{ digest.title }}</div><div style="font-size:12px;color:#888;margin-top:2px">{{ digest.range }}</div></td>
+<td align="right"><table cellpadding="0" cellspacing="0" border="0"><tr>
+{% for s in stats %}
+<td align="right" style="padding-left:16px">
+<div style="font-size:22px;font-weight:bold;color:#1a1a1a;line-height:1">{{ s.count }}</div>
+<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.06em">{{ s.stat }}</div>
+</td>
+{% endfor %}
+</tr></table></td>
+</tr></table></td></tr>
+
+{# Color legend #}
+<tr><td style="padding:8px 20px;background:#f9f9f8;border-bottom:1px solid #eee"><table cellpadding="0" cellspacing="0" border="0"><tr>
+{% for s in stats %}
+<td style="padding-right:16px"><table cellpadding="0" cellspacing="0" border="0"><tr>
+<td width="3" style="width:3px;background:{{ s.color }};font-size:1px;line-height:1px">&nbsp;</td>
+<td style="padding-left:6px;font-size:11px;color:#666;white-space:nowrap">{{ s.legend }}</td>
+</tr></table></td>
+{% endfor %}
+</tr></table></td></tr>
+
+{# TL;DR box with count chips #}
+<tr><td style="padding:16px 20px;border-bottom:1px solid #eee"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td style="background:#f4f4f2;padding:14px 16px">
+<div style="font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:6px">TL;DR: this week</div>
+<div style="font-size:13px;color:#1a1a1a;line-height:1.6">{{ digest.tldr }}</div>
+<div style="margin-top:10px">
+{% for s in stats %}
+<span style="font-size:11px;padding:2px 8px;{{ s.chip_style }};margin-right:6px">{{ s.count }} {{ s.chip }}</span>
+{% endfor %}
+</div>
+</td></tr></table></td></tr>
+
+{# Sections and items #}
+{% for section in sections %}
+<tr><td style="padding:6px 20px;background:#f9f9f8;border-bottom:1px solid #eee;border-top:1px solid #eee">
+<div style="font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:.08em;color:#888">{{ section.label }}</div>
+</td></tr>
+{% for item in section.items %}
+<tr><td style="padding:10px 20px;border-bottom:1px solid #eee">
+<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td width="3" style="vertical-align:top;padding-right:12px">
+<!--[if mso]><table cellpadding="0" cellspacing="0" border="0"><tr><td width="3" bgcolor="{{ section.color }}" style="width:3px;font-size:1px;line-height:1px">&nbsp;</td></tr></table><![endif]-->
+<!--[if !mso]><!--><div style="width:3px;min-height:50px;background:{{ section.color }}">&nbsp;</div><!--<![endif]-->
+</td>
+<td style="vertical-align:top">
+<div style="font-size:13px;font-weight:500;color:#1a1a1a;margin-bottom:4px"><a href="{{ item.url }}" style="color:#1a1a1a;text-decoration:none">{{ item.title }}</a></div>
+{% if item.badges %}
+<div style="margin-bottom:4px">
+{% for b in item.badges %}
+<span style="font-size:10px;font-weight:bold;padding:2px 6px;{{ b.style }};white-space:nowrap;margin-right:4px">{% if b.warn %}&#9888; {% endif %}{{ b.name }}</span>
+{% endfor %}
+</div>
+{% endif %}
+<div style="font-size:11px;color:#666;line-height:1.5;margin-bottom:3px">{{ item.tldr }}</div>
+<div style="font-size:11px;color:#aaa">{{ item.source }} &middot; {{ item.date }}</div>
+</td></tr></table>
+</td></tr>
+{% endfor %}
+{% endfor %}
+
+{# Fetch errors reported by the routine #}
+{% if digest.errors %}
+<tr><td style="padding:16px 20px"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td style="background:#faeeda;border:1px solid #ef9f27;padding:12px 14px">
+<div style="font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:.08em;color:#633806;margin-bottom:6px">Errors this run</div>
+{% for e in digest.errors %}
+<div style="font-size:12px;color:#854f0b;line-height:1.6">{{ e }}</div>
+{% endfor %}
+</td></tr></table></td></tr>
+{% endif %}
+
+<tr><td style="padding:8px 20px;background:#f9f9f8;border-top:1px solid #eee">
+<div style="font-size:11px;color:#aaa">{{ footer }}</div>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>

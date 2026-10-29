@@ -1,0 +1,14 @@
+{#- Plain-text part of the alert email. Autoescape is off for .txt templates. -#}
+[{{ theme.severity[data.severity].label | upper }}] {{ data.title }}
+
+{{ data.summary }}
+{% if data.fields %}
+
+{% for f in data.fields %}
+{{ f.label }}: {{ f.value }}
+{% endfor %}
+{% endif %}
+{% if data.link is defined %}
+
+{{ data.link }}
+{% endif %}

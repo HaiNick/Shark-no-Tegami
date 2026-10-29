@@ -1,0 +1,25 @@
+{#- Default Markdown theme. Context: content (cleaned HTML of the whole body), meta, intro, sections, subject, theme. -#}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>{{ subject }}</title>
+<style>
+body { margin: 0; padding: 24px 12px; background: #f6f6f4; color: #1a1a1a;
+  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 16px; line-height: 1.6; }
+.wrap { max-width: 640px; margin: 0 auto; background: #ffffff; padding: 24px 28px; border-radius: 6px; }
+h1, h2, h3 { line-height: 1.3; margin: 1.4em 0 0.5em; }
+h1 { font-size: 24px; } h2 { font-size: 20px; } h3 { font-size: 17px; }
+p, ul, ol, blockquote, pre { margin: 0 0 1em; }
+a { color: #0b5cad; }
+code { font-family: Menlo, Consolas, monospace; font-size: 14px; background: #f0f0ee; padding: 1px 4px; border-radius: 3px; }
+pre { background: #f0f0ee; padding: 12px; border-radius: 4px; overflow-x: auto; }
+pre code { padding: 0; background: transparent; }
+blockquote { border-left: 3px solid #d0d0cc; padding-left: 12px; color: #555555; }
+hr { border: 0; border-top: 1px solid #e0e0dc; }
+img { max-width: 100%; }
+</style>
+</head>
+<body><div class="wrap">
+{{ content }}
+</div></body>
+</html>

@@ -1,0 +1,3 @@
+# Default theme for content_type markdown: readable typography, 640 px column.
+input: markdown
+inline_css: true

@@ -7,7 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY pyproject.toml .
 COPY src/ ./src/
-COPY themes/ ./themes/
+COPY themes/ ./themes.default/
 
 EXPOSE 8000
 

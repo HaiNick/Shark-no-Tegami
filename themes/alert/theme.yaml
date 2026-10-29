@@ -1,0 +1,15 @@
+# Compact alert email for monitoring routines. The body is JSON (content_type json),
+# validated against schema.json before rendering.
+input: json
+inline_css: true
+
+# Color bar and label per severity.
+severity:
+  info:     { color: "#0b5cad", label: "Info" }
+  warning:  { color: "#b26a00", label: "Warning" }
+  critical: { color: "#a32d2d", label: "Critical" }
+
+# Optional: narrow who this theme may be sent to. Intersected with
+# TEGAMI_ALLOWED_RECIPIENTS; it can never add an address that list doesn't allow.
+# allowed_recipients:
+#   - you@example.com

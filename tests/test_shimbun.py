@@ -1,7 +1,7 @@
 import re
 
 from tegami.pipeline import Request, process
-from tegami.render import render
+from conftest import render_theme as render
 from tegami.validate import find_violations
 
 

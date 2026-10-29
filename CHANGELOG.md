@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.4.0] - 2026-10-29
+
+### Themes as editable Jinja templates
+
+- **Every theme is a folder of templates** (`theme.yaml`, `email.html.j2`, optional
+  `email.txt.j2`, and `schema.json` for JSON themes). The Shimbun layout moved from
+  the vendored `render_html()` into `themes/shimbun/email.html.j2`; its styles, legend
+  labels, and footer moved into `theme.yaml`. The output is unchanged (parity test).
+- **Host overrides without a rebuild.** The image ships themes at `/app/themes.default`;
+  a read-only mount at `/app/themes` (`THEMES_DIR`) overrides them per file. Templates
+  are re-read on every render, so edits apply on the next send.
+- **Theme inputs:** `markdown` (front matter as `meta`, `## ` sections), `shimbun`
+  (strict dialect), and `json` (new `content_type: json`, validated against the
+  theme's `schema.json`). New example theme `alert`.
+- **Per-theme `allowed_recipients`** narrows the global allowlist, never widens it.
+- **Sandboxed rendering:** `ImmutableSandboxedEnvironment`, autoescape, `StrictUndefined`.
+- **New error codes:** `E_THEME_TEMPLATE` (broken template, `theme.yaml`, or schema;
+  names the file and line) and `E_DATA_INVALID` (JSON body fails its schema; names the
+  JSON path). Unknown or malformed theme names return `E_ARGS`.
+- **Startup check:** renders a sample digest through every `shimbun` theme and compiles
+  the others. Failures are logged; the server stays up.
+- **Validator hardening for templates:**
+  - Runs before and after CSS inlining (the inliner removes `<link>` and `@import`).
+  - The inliner never loads remote stylesheets and drops `<link>` and @-rules.
+  - Trusted `<style>` blocks must pass the blocked-CSS check.
+  - Conditional comment bodies are validated as HTML (plain and table-wrapped) and
+    with a raw token scan for blocked tags, `on*=`, `srcdoc`, `http-equiv`, and
+    `javascript:`, `vbscript:`, and `data:` schemes.
+- **Fix: validator segfault.** Reading `.attributes` on comment nodes crashes
+  selectolax 0.3.x depending on heap state. The validator now skips non-element
+  nodes. This also affected 0.3.0 (comment nodes appear in every Shimbun email).
+- **Tool description** now lists the error codes in its first paragraph, the only part
+  FastMCP 4 shows to clients.
+- `body_ref` accepts `.json`. New dependencies: `jinja2`, `jsonschema`. New env vars:
+  `THEMES_DIR`, `THEMES_DEFAULT_DIR`.
+
 ## [0.3.0] - 2026-10-29
 
 ### Tegami v2: Markdown, `body_ref`, and content validation
