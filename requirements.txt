@@ -1,7 +1,13 @@
-fastmcp>=3.4.4
+fastmcp>=4.1.4,<5
 aiosmtplib>=3.0
 uvicorn[standard]>=0.46.0
 starlette>=1.0.0
+httpx>=0.28
+nh3>=0.2.18
+markdown-it-py>=3.0
+selectolax>=0.3.21,<0.4
+css-inline>=0.14
+pyyaml>=6.0
 
 # dev
 pytest>=9.0.3
