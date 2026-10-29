@@ -32,10 +32,18 @@ def test_trusted_template_relaxes_only_mso_plain_meta_and_style():
     assert find_violations("<script>x</script>", trusted_template=True) == ["<script> element"]
 
 
-def test_style_element_blocked_untrusted_allowed_trusted():
-    html = "<style>@import url(https://x)</style><p>x</p>"
-    assert find_violations(html) == ["<style> element"]
-    assert find_violations(html, trusted_template=True) == []
+def test_style_element_blocked_untrusted_allowed_trusted_only_when_clean():
+    clean = "<style>p { color: red }</style><p>x</p>"
+    assert find_violations(clean) == ["<style> element"]
+    assert find_violations(clean, trusted_template=True) == []
+
+
+@pytest.mark.parametrize(
+    "css",
+    ["@import url(https://x);", "p { background: url(https://x/t.png) }", "p { width: expression(alert(1)) }", "p { background: javascript:x }"],
+)
+def test_style_element_with_blocked_css_fails_even_when_trusted(css):
+    assert find_violations(f"<style>{css}</style>", trusted_template=True) == ["<style> element contains blocked CSS"]
 
 
 @pytest.mark.parametrize(
@@ -62,4 +70,24 @@ def test_clean_conditional_comments_pass_when_trusted():
 
 def test_conditional_findings_are_not_duplicated():
     found = find_violations("<!--[if mso]><script>x</script><![endif]-->", trusted_template=True)
-    assert found == ["<script> element (inside conditional comment)"]
+    assert found == ["<script> element (inside conditional comment)", "<script> tag (raw scan) (inside conditional comment)"]
+
+
+@pytest.mark.parametrize(
+    "body,needle",
+    [
+        ('<td onclick="x()">x</td>', "onclick attribute (raw scan)"),  # stray <td>, no surrounding table
+        ("<v:rect href='vbscript:x'/>", "vbscript: scheme (raw scan)"),
+        ('<img src="data:image/png;base64,AAA">', "data: scheme (raw scan)"),
+        ("<iframe src=https://x></iframe>", "<iframe> tag (raw scan)"),
+        ('<meta http-equiv="refresh" content="0">', "http-equiv attribute (raw scan)"),
+    ],
+)
+def test_conditional_raw_scan(body, needle):
+    found = find_violations(f"<!--[if mso]>{body}<![endif]-->", trusted_template=True)
+    assert f"{needle} (inside conditional comment)" in found, found
+
+
+def test_conditional_mso_style_block_is_allowed():
+    html = "<!--[if mso]><style>td { mso-line-height-rule: exactly; }</style><![endif]-->"
+    assert find_violations(html, trusted_template=True) == []

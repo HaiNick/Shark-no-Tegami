@@ -37,7 +37,8 @@ SCHEMA_FILE = "schema.json"
 MAX_DETAILS = 20
 
 _md = MarkdownIt("commonmark", {"html": False})
-_inliner = css_inline.CSSInliner(load_remote_stylesheets=False)
+# Never fetch anything a template points at, and drop <link> and @-rules.
+_inliner = css_inline.CSSInliner(load_remote_stylesheets=False, keep_link_tags=False, keep_at_rules=False)
 
 
 def _template_error(message: str) -> TegamiError:
@@ -58,6 +59,13 @@ class ThemeOutput:
     html: str
     text: str | None  # None: the caller derives the text part from the HTML
     items: dict[str, int] | None = None
+
+
+def _require_clean_template(html: str) -> None:
+    violations = find_violations(html, trusted_template=True)
+    if violations:
+        noun = "violation" if len(violations) == 1 else "violations"
+        raise TegamiError("E_UNSAFE_CONTENT", f"{len(violations)} {noun}", violations)
 
 
 def _autoescape(name: str | None) -> bool:
@@ -194,17 +202,17 @@ class ThemeStore:
         context.update(subject=subject, theme=theme.config)
 
         html = self._run(theme.name, HTML_TEMPLATE, context)
+        # Templates are trusted only for conditional comments, <meta> without
+        # http-equiv, and <style> with clean CSS. Everything else is rejected.
+        # Checked before inlining too: the inliner removes <link> and @import,
+        # so a post-inline check alone can't see what the template asked for.
+        _require_clean_template(html)
         if theme.inline_css:
             try:
                 html = _inliner.inline(html)
             except Exception as e:
                 raise _template_error(f"{theme.name}/{HTML_TEMPLATE}: CSS inlining failed: {e}")
-        # Templates are trusted only for conditional comments, <meta> without
-        # http-equiv, and <style>. Everything else is still rejected.
-        violations = find_violations(html, trusted_template=True)
-        if violations:
-            noun = "violation" if len(violations) == 1 else "violations"
-            raise TegamiError("E_UNSAFE_CONTENT", f"{len(violations)} {noun}", violations)
+            _require_clean_template(html)
 
         text = self._run(theme.name, TEXT_TEMPLATE, context) if self.find(theme.name, TEXT_TEMPLATE) else default_text
         return ThemeOutput(html=html, text=text, items=items)
