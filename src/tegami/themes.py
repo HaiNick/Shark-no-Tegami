@@ -321,6 +321,16 @@ class ThemeStore:
         return problems
 
 
+SHIMBUN_SAMPLE = Path(__file__).resolve().parent / "samples" / "shimbun.md"
+
+
+def startup_check(override_dir: Path, default_dir: Path) -> tuple[list[str], list[str]]:
+    """Returns (available themes, problems). Never raises: a broken theme only
+    fails its own sends with E_THEME_TEMPLATE until it is fixed."""
+    store = ThemeStore(override_dir, default_dir)
+    return store.available(), store.self_check(SHIMBUN_SAMPLE.read_text(encoding="utf-8"))
+
+
 # -- input parsers (module level: no theme state) ---------------------------
 
 

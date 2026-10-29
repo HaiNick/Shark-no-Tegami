@@ -40,3 +40,28 @@ async def test_errors_are_results_not_exceptions(server):
         assert res.structured_content["code"] == "E_RECIPIENT"
         res = await client.call_tool("send_email", {"to": "01nicklas07@gmail.com", "subject": "s", "body_ref": f"HaiNick/shimbun-archive@{'a' * 40}:digests/x.md"})
         assert res.structured_content["code"] == "E_REF_NOT_ALLOWED"
+
+
+def test_startup_check_reports_problems_without_raising(tmp_path):
+    from tegami.config import DEFAULT_THEMES_DEFAULT_DIR
+    from tegami.themes import startup_check
+
+    themes, problems = startup_check(tmp_path, DEFAULT_THEMES_DEFAULT_DIR)
+    assert themes == ["alert", "default", "shimbun"] and problems == []
+    (tmp_path / "shimbun").mkdir()
+    (tmp_path / "shimbun" / "email.html.j2").write_text("{% for %}")
+    themes, problems = startup_check(tmp_path, DEFAULT_THEMES_DEFAULT_DIR)
+    assert len(problems) == 1 and "E_THEME_TEMPLATE" in problems[0] and "(override) line 1" in problems[0]
+
+
+async def test_json_alert_through_mcp(server):
+    import json
+
+    async with Client(server.mcp) as client:
+        tool = next(t for t in await client.list_tools() if t.name == "send_email")
+        assert "E_THEME_TEMPLATE" in tool.description and "E_DATA_INVALID" in tool.description
+        res = await client.call_tool("send_email", {
+            "to": "01nicklas07@gmail.com", "subject": "alert", "content_type": "json", "theme": "alert", "dry_run": True,
+            "body": json.dumps({"title": "t", "severity": "info", "summary": "s", "fields": []}),
+        })
+        assert res.structured_content["status"] == "validated", res.structured_content
