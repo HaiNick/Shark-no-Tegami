@@ -17,7 +17,7 @@ def test_raw_script_is_escaped():
 
 def test_default_theme_output_is_inlined_and_clean():
     out = render("# Title\n\n[ok](https://example.com)", "markdown", "default", "t").html
-    assert "<style" not in out
+    assert "<style" not in out  # css_inline drops the template's <style> after inlining
     assert "max-width: 640px" in out
     assert '<a href="https://example.com"' in out
     assert find_violations(out) == []

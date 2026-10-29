@@ -13,6 +13,7 @@ VECTORS = [
     ('<svg><a xlink:href="javascript:x"/></svg>', ["<svg> element", "scheme not allowed"]),
     ("<!--[if mso]><v:rect/><![endif]-->", ["conditional comment"]),
     ('<meta http-equiv=refresh content="0;url=https://evil">', ["<meta> element"]),
+    ("<style>@import url(https://x)</style><p>x</p>", ["<style> element"]),
 ]
 
 
@@ -24,8 +25,14 @@ def test_vectors(html, expected):
         assert any(needle in v for v in found), (needle, found)
 
 
-def test_trusted_template_relaxes_only_mso_and_plain_meta():
+def test_trusted_template_relaxes_only_mso_plain_meta_and_style():
     html = '<meta charset="UTF-8"><!--[if mso]><table></table><![endif]--><p>x</p>'
     assert find_violations(html, trusted_template=True) == []
     assert find_violations('<meta http-equiv="refresh" content="0">', trusted_template=True) == ["<meta> element"]
     assert find_violations("<script>x</script>", trusted_template=True) == ["<script> element"]
+
+
+def test_style_element_blocked_untrusted_allowed_trusted():
+    html = "<style>@import url(https://x)</style><p>x</p>"
+    assert find_violations(html) == ["<style> element"]
+    assert find_violations(html, trusted_template=True) == []

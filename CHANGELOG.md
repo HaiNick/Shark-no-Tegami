@@ -13,6 +13,8 @@
   skill, per-section `items` counts).
 - **Content validator** (`src/tegami/validate.py`, Lexbor-based) runs on caller
   HTML and on every rendered message. Violations return `E_UNSAFE_CONTENT`.
+  `<style>` elements are blocked in caller HTML and allowed only in Tegami's
+  own trusted templates.
 - **`dry_run`** validates and renders without sending.
 - **Recipient allowlist** (`TEGAMI_ALLOWED_RECIPIENTS`) for `to`, `cc`, and `bcc`.
 - **Subject checks**: CR or LF and subjects over 200 characters are rejected.

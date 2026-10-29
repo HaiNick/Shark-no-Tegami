@@ -6,7 +6,7 @@ from selectolax.lexbor import LexborHTMLParser
 BLOCKED_TAGS = {
     "script", "iframe", "frame", "frameset", "object", "embed", "applet",
     "form", "input", "button", "textarea", "select", "base", "link", "meta",
-    "svg", "math", "template",
+    "svg", "math", "template", "style",
 }
 URL_ATTRS = {"href", "src", "action", "formaction", "background", "poster", "xlink:href"}
 SAFE_SCHEMES = ("https:", "http:", "mailto:")
@@ -25,6 +25,8 @@ def find_violations(html: str, trusted_template: bool = False) -> list[str]:
         if tag in BLOCKED_TAGS:
             if trusted_template and tag == "meta" and "http-equiv" not in (node.attributes or {}):
                 continue  # the theme's own charset/viewport meta tags
+            if trusted_template and tag == "style":
+                continue  # the theme's own stylesheet
             out.append(f"<{tag}> element")
             continue
         for name, val in (node.attributes or {}).items():

@@ -28,11 +28,11 @@ Reference implementation: [Shark-no-Kari](https://github.com/HaiNick/Shark-no-Ka
    - `plain`: `text/plain` only.
    - `html`: the content validator runs on the body. Any violation returns `E_UNSAFE_CONTENT`.
    - `markdown` + `default`: CommonMark with raw HTML off, `nh3` cleaning, a trusted 640 px template, inlined CSS, then the validator.
-   - `markdown` + `shimbun`: the strict Shark-no-Shimbun dialect parser and renderer vendored from the `shimbun-digest` skill (`src/tegami/vendor/shimbun_lib.py`), then the validator with the template relaxations.
+   - `markdown` + `shimbun`: the strict Shark-no-Shimbun dialect parser and renderer vendored from the `shimbun-digest` skill (`src/tegami/vendor/shimbun_lib.py`), then the validator with the template relaxations (MSO conditional comments, `<meta>` without `http-equiv`, and `<style>`).
 4. Send `multipart/alternative` (text part plus HTML part) with `Message-ID` and `Date`.
 5. Log one metadata line: timestamp, recipient count, source, SHA-256, HTML bytes, and result code. Bodies and subjects are never logged.
 
-The validator (`src/tegami/validate.py`) parses the HTML with Lexbor and rejects scripting and embedding elements, `on*` handlers, URL attributes with schemes other than `http`, `https`, and `mailto`, inline styles with `url(`, `expression(`, `@import`, or script schemes, `srcdoc`, `http-equiv`, and MSO conditional comments.
+The validator (`src/tegami/validate.py`) parses the HTML with Lexbor and rejects scripting and embedding elements, `<style>` elements, `on*` handlers, URL attributes with schemes other than `http`, `https`, and `mailto`, inline styles with `url(`, `expression(`, `@import`, or script schemes, `srcdoc`, `http-equiv`, and MSO conditional comments.
 
 ### Results
 
