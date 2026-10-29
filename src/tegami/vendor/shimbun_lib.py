@@ -350,7 +350,12 @@ def parse_dialect(text: str, section_labels: list[str]) -> Digest:
         end = lines.index("---", 1)
     except ValueError:
         raise DialectError(1, "front matter not closed")
-    fm = yaml.safe_load("\n".join(lines[1:end])) or {}
+    try:
+        fm = yaml.safe_load("\n".join(lines[1:end])) or {}
+    except yaml.YAMLError as exc:
+        mark = getattr(exc, "problem_mark", None)
+        line = (mark.line + 2) if mark else 2  # +1 for 1-based, +1 for the opening '---'
+        raise DialectError(line, f"front matter is not valid YAML ({getattr(exc, 'problem', None) or exc})")
     if not isinstance(fm, dict) or set(fm) != set(FRONT_KEYS):
         raise DialectError(2, f"front matter keys must be exactly {list(FRONT_KEYS)}")
     fm = {k: str(v) for k, v in fm.items()}

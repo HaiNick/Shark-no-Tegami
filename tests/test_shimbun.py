@@ -1,3 +1,5 @@
+import re
+
 from tegami.pipeline import Request, process
 from tegami.render import render
 from tegami.validate import find_violations
@@ -32,7 +34,8 @@ async def test_unknown_badge_reports_line(cfg, relay, sender, digest_md):
 async def test_front_matter_yaml_error_is_theme_parse(cfg, relay, sender, digest_md):
     bad = digest_md.replace('title: "Shark-no-Shimbun"', 'title: [unclosed')
     r = await process(req(bad), cfg, relay, sender=sender)
-    assert r["code"] == "E_THEME_PARSE" and r["message"].startswith("line ")
+    assert r["code"] == "E_THEME_PARSE"
+    assert re.match(r"line \d+: front matter is not valid YAML", r["message"]), r["message"]
 
 
 async def test_non_https_item_url_is_rejected(cfg, relay, sender, digest_md):

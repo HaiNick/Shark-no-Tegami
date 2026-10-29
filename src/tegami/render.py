@@ -98,11 +98,6 @@ def render_shimbun(source: str) -> tuple[str, dict[str, int]]:
         digest = parse_dialect(source, [s["label"] for s in sections])
     except DialectError as e:
         raise TegamiError("E_THEME_PARSE", str(e))
-    except yaml.YAMLError as e:
-        # The vendored parser lets front-matter YAML errors through unwrapped.
-        mark = getattr(e, "problem_mark", None)
-        line = mark.line + 2 if mark is not None else 2  # +1 for 1-based, +1 for the opening '---'
-        raise TegamiError("E_THEME_PARSE", f"line {line}: invalid front matter YAML")
     out = render_html(digest, sections)
     _require_clean(out, trusted_template=True)
     return out, {label: len(items) for label, items in digest.sections}
