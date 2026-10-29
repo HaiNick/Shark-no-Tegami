@@ -3,8 +3,16 @@
 import logging
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 
 logger = logging.getLogger("shark-no-tegami")
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+# The image ships the built-in themes at /app/themes.default; a checkout uses themes/.
+DEFAULT_THEMES_DEFAULT_DIR = next(
+    (p for p in (_REPO_ROOT / "themes.default", _REPO_ROOT / "themes") if p.is_dir()),
+    _REPO_ROOT / "themes",
+)
 
 
 @dataclass(frozen=True)
@@ -16,6 +24,9 @@ class Config:
     github_token: str = ""
     max_body_bytes: int = 262144
     ref_timeout_s: float = 10.0
+    # Host override directory (mounted read-only), then the built-in defaults.
+    themes_dir: Path = Path("/app/themes")
+    themes_default_dir: Path = DEFAULT_THEMES_DEFAULT_DIR
 
 
 def _split(value: str) -> list[str]:
@@ -57,4 +68,6 @@ def load_config(env=os.environ) -> Config:
         github_token=token,
         max_body_bytes=int(env.get("TEGAMI_MAX_BODY_BYTES", "262144")),
         ref_timeout_s=float(env.get("TEGAMI_REF_TIMEOUT_S", "10")),
+        themes_dir=Path(env.get("THEMES_DIR", "/app/themes")),
+        themes_default_dir=Path(env.get("THEMES_DEFAULT_DIR", str(DEFAULT_THEMES_DEFAULT_DIR))),
     )

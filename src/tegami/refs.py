@@ -10,7 +10,7 @@ from .config import Config
 from .errors import TegamiError
 
 GITHUB_API = "https://api.github.com"  # fixed; never taken from the caller
-REF_RE = re.compile(r"^([\w.-]+/[\w.-]+)@([0-9a-f]{40}):([\w./-]+\.(md|html|txt))$", re.ASCII)
+REF_RE = re.compile(r"^([\w.-]+/[\w.-]+)@([0-9a-f]{40}):([\w./-]+\.(md|html|txt|json))$", re.ASCII)
 
 
 @dataclass(frozen=True)
@@ -33,7 +33,7 @@ class Body:
 def parse_ref(value: str, cfg: Config) -> Ref:
     m = REF_RE.match(value)
     if not m:
-        raise TegamiError("E_REF_FORMAT", "body_ref must be OWNER/REPO@SHA40:PATH ending in .md, .html, or .txt")
+        raise TegamiError("E_REF_FORMAT", "body_ref must be OWNER/REPO@SHA40:PATH ending in .md, .html, .txt, or .json")
     repo, sha, path = m.group(1), m.group(2), m.group(3)
     if path.startswith("/") or any(seg in ("", ".", "..") for seg in path.split("/")):
         raise TegamiError("E_REF_FORMAT", "body_ref path must not be absolute or contain empty, '.', or '..' segments")

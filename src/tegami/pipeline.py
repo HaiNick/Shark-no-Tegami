@@ -14,7 +14,8 @@ import httpx
 from .config import Config
 from .errors import TegamiError
 from .refs import Body, fetch_ref, parse_ref
-from .render import CONTENT_TYPES, THEMES, Rendered, render
+from .render import CONTENT_TYPES, THEMED, Rendered, render
+from .themes import INPUTS, NAME_RE, Theme, ThemeStore
 
 logger = logging.getLogger("shark-no-tegami")
 
@@ -43,39 +44,69 @@ class Request:
     dry_run: bool = False
 
 
-def split_addresses(value: str, field: str, cfg: Config) -> list[str]:
+def split_addresses(value: str, field: str) -> list[str]:
     addrs = [a.strip() for a in (value or "").split(",") if a.strip()]
     for addr in addrs:
         if not _ADDR_RE.match(addr):
             raise TegamiError("E_ARGS", f"{field} contains an invalid address")
-    if cfg.allowed_recipients is not None:
-        blocked = [a for a in addrs if a.lower() not in cfg.allowed_recipients]
-        if blocked:
-            raise TegamiError("E_RECIPIENT", f"{len(blocked)} {field} address(es) not on TEGAMI_ALLOWED_RECIPIENTS", blocked)
     return addrs
 
 
-def check_args(req: Request, cfg: Config) -> tuple[list[str], list[str], list[str], str | None]:
+def allowed_for(cfg: Config, theme: Theme | None) -> tuple[frozenset[str] | None, str]:
+    """Effective allowlist: the global list, narrowed (never widened) by the theme's own."""
+    narrow = theme.allowed_recipients if theme else None
+    if narrow is None:
+        return cfg.allowed_recipients, "TEGAMI_ALLOWED_RECIPIENTS"
+    if cfg.allowed_recipients is None:
+        return narrow, f"theme {theme.name!r} allowed_recipients"
+    return cfg.allowed_recipients & narrow, f"TEGAMI_ALLOWED_RECIPIENTS and theme {theme.name!r} allowed_recipients"
+
+
+def check_recipients(fields: dict[str, list[str]], cfg: Config, theme: Theme | None) -> None:
+    allowed, source = allowed_for(cfg, theme)
+    if allowed is None:
+        return
+    for field, addrs in fields.items():
+        blocked = [a for a in addrs if a.lower() not in allowed]
+        if blocked:
+            raise TegamiError("E_RECIPIENT", f"{len(blocked)} {field} address(es) not allowed by {source}", blocked)
+
+
+def check_args(req: Request) -> tuple[list[str], list[str], list[str], str | None]:
+    """Checks that need no filesystem access. Returns to, cc, bcc, and the theme name."""
     if bool(req.body) == bool(req.body_ref):
         raise TegamiError("E_ARGS", "pass exactly one of body and body_ref")
     if req.content_type not in CONTENT_TYPES:
         raise TegamiError("E_ARGS", f"content_type must be one of {', '.join(CONTENT_TYPES)}")
     theme = req.theme or None
-    if theme is not None and req.content_type != "markdown":
-        raise TegamiError("E_ARGS", "theme is only valid with content_type 'markdown'")
+    if theme is not None and req.content_type not in THEMED:
+        raise TegamiError("E_ARGS", "theme is only valid with content_type 'markdown' or 'json'")
     if req.content_type == "markdown":
         theme = theme or "default"
-        if theme not in THEMES:
-            raise TegamiError("E_ARGS", f"theme must be one of {', '.join(THEMES)}")
+    if req.content_type == "json" and theme is None:
+        raise TegamiError("E_ARGS", "content_type 'json' needs a theme with input: json")
+    if theme is not None and not NAME_RE.match(theme):
+        raise TegamiError("E_ARGS", "theme must match ^[a-z0-9-]{1,32}$")
     if "\r" in req.subject or "\n" in req.subject:
         raise TegamiError("E_ARGS", "subject must not contain CR or LF")
     if len(req.subject) > MAX_SUBJECT:
         raise TegamiError("E_ARGS", f"subject is longer than {MAX_SUBJECT} characters")
 
-    to = split_addresses(req.to, "to", cfg)
+    to = split_addresses(req.to, "to")
     if not to:
         raise TegamiError("E_ARGS", "to must contain at least one address")
-    return to, split_addresses(req.cc, "cc", cfg), split_addresses(req.bcc, "bcc", cfg), theme
+    return to, split_addresses(req.cc, "cc"), split_addresses(req.bcc, "bcc"), theme
+
+
+def resolve_theme(name: str | None, content_type: str, cfg: Config) -> tuple[Theme | None, ThemeStore | None]:
+    if name is None:
+        return None, None
+    store = ThemeStore(cfg.themes_dir, cfg.themes_default_dir)
+    theme = store.resolve(name)
+    expected = INPUTS[theme.input]
+    if content_type != expected:
+        raise TegamiError("E_ARGS", f"theme {name!r} has input {theme.input!r} and takes content_type {expected!r}")
+    return theme, store
 
 
 async def resolve_body(req: Request, cfg: Config, transport: httpx.AsyncBaseTransport | None, meta: dict) -> Body:
@@ -129,13 +160,15 @@ async def process(
 
 
 async def _process(req, cfg, relay, meta, transport, sender) -> dict:
-    to, cc, bcc, theme = check_args(req, cfg)
+    to, cc, bcc, theme_name = check_args(req)
     meta["rcpt"] = len(to) + len(cc) + len(bcc)
+    theme, store = resolve_theme(theme_name, req.content_type, cfg)
+    check_recipients({"to": to, "cc": cc, "bcc": bcc}, cfg, theme)
 
     body = await resolve_body(req, cfg, transport, meta)
     meta["source"], meta["sha256"] = body.source, body.sha256
 
-    rendered = render(body.text, req.content_type, theme, req.subject)
+    rendered = render(body.text, req.content_type, theme, req.subject, store)
     html_bytes = len(rendered.html.encode("utf-8")) if rendered.html is not None else 0
     meta["html_bytes"] = html_bytes
 

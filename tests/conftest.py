@@ -7,8 +7,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from tegami.config import Config, parse_ref_allowlist  # noqa: E402
 from tegami.pipeline import Relay  # noqa: E402
+from tegami.render import render  # noqa: E402
+from tegami.themes import ThemeStore  # noqa: E402
 
 FIXTURES = Path(__file__).parent / "fixtures"
+THEMES = Path(__file__).resolve().parents[1] / "themes"
+NO_OVERRIDE = Path("/nonexistent-tegami-overrides")
+
+
+def render_theme(source, content_type, theme, subject, store=None):
+    """render() against the repo's built-in themes, resolving the theme by name."""
+    store = store or ThemeStore(NO_OVERRIDE, THEMES)
+    return render(source, content_type, store.resolve(theme), subject, store)
 SHA = "0123456789abcdef0123456789abcdef01234567"
 REF = f"HaiNick/shimbun-archive@{SHA}:digests/2026-W44.md"
 
@@ -21,6 +31,8 @@ def cfg():
         github_token="test-token",
         max_body_bytes=4096,
         ref_timeout_s=1.0,
+        themes_dir=NO_OVERRIDE,
+        themes_default_dir=THEMES,
     )
 
 

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Tegami alert",
+  "type": "object",
+  "required": ["title", "severity", "summary", "fields"],
+  "additionalProperties": false,
+  "properties": {
+    "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "severity": { "enum": ["info", "warning", "critical"] },
+    "summary": { "type": "string", "maxLength": 4000 },
+    "fields": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "required": ["label", "value"],
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "value": { "type": ["string", "number", "boolean"] }
+        }
+      }
+    },
+    "link": { "type": "string", "pattern": "^https://[^\\s]+$", "maxLength": 2000 }
+  }
+}
