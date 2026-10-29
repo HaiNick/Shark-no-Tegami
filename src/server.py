@@ -187,4 +187,4 @@ if __name__ == "__main__":
         logger.info("Bearer token auth is ENABLED")
     else:
         logger.warning("No MCP_API_KEY set - server is unauthenticated!")
-    uvicorn.run(app, host=host, port=port)
+    uvicorn.run(app, host=host, port=port, proxy_headers=True, forwarded_allow_ips="*")
