@@ -60,3 +60,29 @@ class SpySender:
 @pytest.fixture
 def sender():
     return SpySender()
+
+
+@pytest.fixture
+def theme_dirs(tmp_path):
+    """A writable copy of the built-in themes as defaults, plus an empty override dir."""
+    import shutil
+
+    default = tmp_path / "themes.default"
+    shutil.copytree(THEMES, default)
+    override = tmp_path / "themes"
+    override.mkdir()
+    return override, default
+
+
+@pytest.fixture
+def tcfg(cfg, theme_dirs):
+    from dataclasses import replace
+
+    override, default = theme_dirs
+    return replace(cfg, themes_dir=override, themes_default_dir=default)
+
+
+def write(path: Path, text: str) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path
