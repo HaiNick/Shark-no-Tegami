@@ -206,6 +206,8 @@ Markdown is rendered with raw HTML off and cleaned with `nh3`, so `content`, `in
 |---|---|
 | `data` | The JSON object from the body, after it passes `schema.json` |
 
+`data` and `meta` are plain mappings. For a key that is also a mapping method name (`items`, `keys`, `values`, `get`), use subscript syntax: `data["items"]`, not `data.items`.
+
 ### theme.yaml keys
 
 | Key | Required | Description |
