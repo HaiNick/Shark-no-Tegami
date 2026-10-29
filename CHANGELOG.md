@@ -23,8 +23,11 @@
   no longer logged.
 - **Uvicorn trusts proxy headers** (`proxy_headers=True`, `forwarded_allow_ips="*"`)
   behind Caddy. OIDC config is unchanged.
+- **fastmcp pinned to `>=4.1.4,<5`** (the version this release was tested with).
+  Deploying it upgrades a 3.x container to FastMCP 4.x against live Pocket ID;
+  the `OIDCProxy` arguments are unchanged.
 - **Healthcheck probes `/.well-known/oauth-protected-resource/mcp` first.** FastMCP
-  4.x (which `fastmcp>=3.4.4` resolves to) serves RFC 9728 metadata at the
+  4.x (which the old `fastmcp>=3.4.4` resolved to) serves RFC 9728 metadata at the
   path-suffixed URL, so a fresh build of 0.2.0 reported unhealthy. The bare path
   stays as a fallback for 3.x.
 - New dependencies: `httpx`, `nh3`, `markdown-it-py`, `selectolax` (0.3.x),
