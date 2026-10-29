@@ -36,3 +36,30 @@ def test_style_element_blocked_untrusted_allowed_trusted():
     html = "<style>@import url(https://x)</style><p>x</p>"
     assert find_violations(html) == ["<style> element"]
     assert find_violations(html, trusted_template=True) == []
+
+
+@pytest.mark.parametrize(
+    "html,needle",
+    [
+        ("<!--[if mso]><script>alert(1)</script><![endif]-->", "<script> element (inside conditional comment)"),
+        ('<!--[if mso]><table><tr><td onclick="x()">x</td></tr></table><![endif]-->', "onclick attribute on <td> (inside conditional comment)"),
+        ('<!--[if gte mso 9]><td onclick="x()">x</td><![endif]-->', "onclick attribute on <td> (inside conditional comment)"),  # stray <td>
+        ('<p title="<!--">x</p><!--[if mso]><script>x</script><![endif]-->', "<script> element (inside conditional comment)"),
+        ("<!--[if mso]><script>x</script>", "<script> element (inside conditional comment)"),  # never closed
+    ],
+)
+def test_conditional_comment_content_is_validated_when_trusted(html, needle):
+    assert needle in find_violations(html, trusted_template=True)
+
+
+def test_clean_conditional_comments_pass_when_trusted():
+    html = (
+        '<!--[if mso]><table><tr><td width="3" bgcolor="#a32d2d">&nbsp;</td></tr></table><![endif]-->'
+        '<!--[if !mso]><!--><div style="width:3px;background:#a32d2d">&nbsp;</div><!--<![endif]-->'
+    )
+    assert find_violations(html, trusted_template=True) == []
+
+
+def test_conditional_findings_are_not_duplicated():
+    found = find_violations("<!--[if mso]><script>x</script><![endif]-->", trusted_template=True)
+    assert found == ["<script> element (inside conditional comment)"]

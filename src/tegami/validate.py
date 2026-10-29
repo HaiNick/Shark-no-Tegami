@@ -10,6 +10,10 @@ BLOCKED_TAGS = {
 }
 URL_ATTRS = {"href", "src", "action", "formaction", "background", "poster", "xlink:href"}
 SAFE_SCHEMES = ("https:", "http:", "mailto:")
+# Each "<!--[if ...]>" up to the first "-->" (where the comment ends). Found by
+# position rather than by parsing comments, so a "<!--" hidden in an attribute
+# value can't shift the boundaries and hide a conditional block.
+CONDITIONAL = re.compile(r"<!--\s*\[if[^\]]*\]>(.*?)(?:-->|\Z)", re.I | re.S)
 STYLE_BAD = re.compile(
     r"expression\s*\(|javascript:|vbscript:|url\s*\(|@import|behavior\s*:", re.I
 )
@@ -19,6 +23,16 @@ def find_violations(html: str, trusted_template: bool = False) -> list[str]:
     out = []
     if not trusted_template and re.search(r"<!--\s*\[if", html, re.I):
         out.append("conditional comment (<!--[if ...]>)")
+    if trusted_template:
+        # Outlook renders conditional blocks, but the parser sees only a comment,
+        # so their content is validated as HTML in its own right.
+        # Parsed twice: a stray <td> or <tr> is dropped outside a table, so the
+        # wrapped pass keeps table parts that the plain pass would lose.
+        for m in CONDITIONAL.finditer(html):
+            inner = m.group(1)
+            found = find_violations(inner, trusted_template=True)
+            found += find_violations(f"<table>{inner}</table>", trusted_template=True)
+            out.extend(f"{v} (inside conditional comment)" for v in dict.fromkeys(found))
     tree = LexborHTMLParser(html)
     for node in tree.root.traverse(include_text=False):
         tag = node.tag
