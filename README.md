@@ -1,6 +1,6 @@
 # Shark-no-Tegami
 
-Shark-no-Tegami is a [FastMCP](https://github.com/jlowin/fastmcp) server that exposes a single `send_email` tool. It relays plain-text, HTML, and Markdown email through a Postfix instance reachable at a configurable SMTP host — typically over Tailscale — and is designed for use with Claude Code Routines for automated digest and alert emails.
+Shark-no-Tegami is a [FastMCP](https://github.com/jlowin/fastmcp) server that exposes a single `send_email` tool. It relays plain-text, HTML, and Markdown email through a Postfix instance reachable at a configurable SMTP host (typically over Tailscale), and is designed for use with Claude Code Routines for automated digest and alert emails.
 
 Reference implementation: [Shark-no-Kari](https://github.com/HaiNick/Shark-no-Kari)
 
