@@ -188,10 +188,7 @@ if __name__ == "__main__":
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "8000"))
     logger.info(f"Starting Shark-no-Tegami v{__version__} on {host}:{port}")
-    logger.info(
-        "SMTP relay %s:%d tls=%s auth=%s from=%s",
-        RELAY.host, RELAY.port, RELAY.tls, "yes" if RELAY.username else "no", RELAY.mail_from,
-    )
+    logger.info("Mail transport: %s", RELAY.describe())
     if OIDC_ENABLED:
         logger.info("OIDC authentication is ENABLED (Pocket ID)")
     elif API_KEY:
