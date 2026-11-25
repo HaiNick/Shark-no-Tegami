@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.3.2] - 2026-11-25
+
+### Cloudflare Email Service over HTTPS
+
+- **New `TEGAMI_TRANSPORT=cloudflare_api`**: sends the finished MIME message
+  through `POST /accounts/{id}/email/sending/send_raw` with an API token
+  (**Email Sending: Edit**). Needed on Hetzner Cloud, which blocks outbound
+  ports 25 and 465, so 0.3.1's SMTP path to `smtp.mx.cloudflare.net:465`
+  times out there.
+- New settings `TEGAMI_CF_ACCOUNT_ID` (validated as 32 hex characters) and
+  `TEGAMI_CF_API_TOKEN`. The API base URL is fixed in code, so the token only
+  ever goes to `api.cloudflare.com`.
+- The message is the same one the SMTP path sends (`multipart/alternative`,
+  `Message-ID`, `Date`); BCC recipients go only into the envelope. Results
+  gain `provider_id` when Cloudflare returns a message id.
+- Cloudflare errors, timeouts, and connection failures return `E_SMTP` with
+  Cloudflare's error code and message, never the token.
+- `smtp` stays the default, so existing deployments are unchanged. The startup
+  log line now reads `Mail transport: ...` for both transports.
+
 ## [0.3.1] - 2026-11-25
 
 ### Authenticated SMTP with TLS (Cloudflare Email Service)

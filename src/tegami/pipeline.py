@@ -11,6 +11,7 @@ from email.utils import formatdate, make_msgid
 import aiosmtplib
 import httpx
 
+from .cfapi import send_raw
 from .config import Config
 from .errors import TegamiError
 from .refs import Body, fetch_ref, parse_ref
@@ -24,6 +25,8 @@ _ADDR_RE = re.compile(r"^[^@\s<>,;\"]+@[^@\s<>,;\"]+$")
 
 
 SMTP_TLS_MODES = ("none", "implicit", "starttls")
+TRANSPORTS = ("smtp", "cloudflare_api")
+_CF_ACCOUNT_RE = re.compile(r"^[0-9a-f]{32}$")
 
 
 @dataclass(frozen=True)
@@ -35,6 +38,15 @@ class Relay:
     username: str | None = None
     password: str | None = field(default=None, repr=False)
     timeout: float = 30.0
+    transport: str = "smtp"
+    cf_account_id: str | None = None
+    cf_api_token: str | None = field(default=None, repr=False)
+
+    def describe(self) -> str:
+        if self.transport == "cloudflare_api":
+            return f"cloudflare_api account={self.cf_account_id} from={self.mail_from}"
+        auth = "yes" if self.username else "no"
+        return f"smtp {self.host}:{self.port} tls={self.tls} auth={auth} from={self.mail_from}"
 
     def send_kwargs(self) -> dict:
         kw = {
@@ -51,10 +63,25 @@ class Relay:
 
 
 def relay_from_env(env) -> Relay:
-    """Build the relay from SMTP_* and MAIL_FROM. Raises RuntimeError on bad config."""
+    """Build the relay from MAIL_FROM, TEGAMI_TRANSPORT, and SMTP_* or TEGAMI_CF_*.
+
+    Raises RuntimeError on bad config, so a broken setup fails at startup."""
     mail_from = env.get("MAIL_FROM", "")
     if not mail_from:
         raise RuntimeError("MAIL_FROM env var is required")
+    transport = env.get("TEGAMI_TRANSPORT", "smtp").strip().lower() or "smtp"
+    if transport not in TRANSPORTS:
+        raise RuntimeError(f"TEGAMI_TRANSPORT must be one of {', '.join(TRANSPORTS)}")
+    timeout = float(env.get("SMTP_TIMEOUT_S", "") or 30)
+    if transport == "cloudflare_api":
+        account = env.get("TEGAMI_CF_ACCOUNT_ID", "").strip().lower()
+        token = env.get("TEGAMI_CF_API_TOKEN", "").strip()
+        if not _CF_ACCOUNT_RE.match(account):
+            raise RuntimeError("TEGAMI_CF_ACCOUNT_ID must be the 32-character Cloudflare account ID")
+        if not token:
+            raise RuntimeError("TEGAMI_CF_API_TOKEN is required with TEGAMI_TRANSPORT=cloudflare_api")
+        return Relay(mail_from, "api.cloudflare.com", 443, "implicit", None, None, timeout,
+                     "cloudflare_api", account, token)
     tls = env.get("SMTP_TLS", "none").strip().lower() or "none"
     if tls not in SMTP_TLS_MODES:
         raise RuntimeError(f"SMTP_TLS must be one of {', '.join(SMTP_TLS_MODES)}")
@@ -65,7 +92,6 @@ def relay_from_env(env) -> Relay:
     if username and tls == "none":
         raise RuntimeError("SMTP_USERNAME requires SMTP_TLS=implicit or starttls; refusing to send credentials in plain text")
     port = int(env.get("SMTP_PORT", "") or (465 if tls == "implicit" else 25))
-    timeout = float(env.get("SMTP_TIMEOUT_S", "") or 30)
     return Relay(mail_from, env.get("SMTP_HOST", "localhost"), port, tls, username, password, timeout)
 
 
@@ -151,11 +177,12 @@ async def process(
     *,
     transport: httpx.AsyncBaseTransport | None = None,
     sender=None,
+    api_transport: httpx.AsyncBaseTransport | None = None,
 ) -> dict:
     # source stays a placeholder until parse_ref accepts the ref, so caller text never reaches the log.
     meta = {"rcpt": 0, "source": "body_ref" if req.body_ref else "inline", "sha256": "-", "html_bytes": 0}
     try:
-        result = await _process(req, cfg, relay, meta, transport, sender or aiosmtplib.send)
+        result = await _process(req, cfg, relay, meta, transport, sender or aiosmtplib.send, api_transport)
     except TegamiError as e:
         result = e.to_result()
     code = result["code"] if result["status"] == "error" else result["status"]
@@ -167,7 +194,7 @@ async def process(
     return result
 
 
-async def _process(req, cfg, relay, meta, transport, sender) -> dict:
+async def _process(req, cfg, relay, meta, transport, sender, api_transport=None) -> dict:
     to, cc, bcc, theme = check_args(req, cfg)
     meta["rcpt"] = len(to) + len(cc) + len(bcc)
 
@@ -183,10 +210,19 @@ async def _process(req, cfg, relay, meta, transport, sender) -> dict:
         result["html_preview"] = (rendered.html or "")[:PREVIEW_CHARS]
     else:
         msg = build_message(relay, to, cc, req.subject, rendered)
-        try:
-            await sender(msg, recipients=to + cc + bcc, **relay.send_kwargs())
-        except (aiosmtplib.SMTPException, OSError, TimeoutError) as e:
-            raise TegamiError("E_SMTP", f"relay error: {type(e).__name__}: {e}")
+        if relay.transport == "cloudflare_api":
+            cf_id = await send_raw(
+                msg, mail_from=relay.mail_from, recipients=to + cc + bcc,
+                account_id=relay.cf_account_id, api_token=relay.cf_api_token,
+                timeout=relay.timeout, transport=api_transport,
+            )
+            if cf_id:
+                result["provider_id"] = cf_id
+        else:
+            try:
+                await sender(msg, recipients=to + cc + bcc, **relay.send_kwargs())
+            except (aiosmtplib.SMTPException, OSError, TimeoutError) as e:
+                raise TegamiError("E_SMTP", f"relay error: {type(e).__name__}: {e}")
         result["message_id"] = msg["Message-ID"]
 
     result.update({"source": body.source, "source_sha256": body.sha256, "html_bytes": html_bytes})

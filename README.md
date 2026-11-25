@@ -1,6 +1,6 @@
 # Shark-no-Tegami
 
-Shark-no-Tegami is a [FastMCP](https://github.com/jlowin/fastmcp) server that exposes a single `send_email` tool. It relays plain-text, HTML, and Markdown email through a configurable SMTP relay, either an authenticated submission endpoint such as Cloudflare Email Service (implicit TLS on port 465) or a plain Postfix relay over Tailscale, and is designed for use with Claude Code Routines for automated digest and alert emails.
+Shark-no-Tegami is a [FastMCP](https://github.com/jlowin/fastmcp) server that exposes a single `send_email` tool. It sends plain-text, HTML, and Markdown email either through Cloudflare Email Service's REST API over HTTPS (`TEGAMI_TRANSPORT=cloudflare_api`, for hosts where outbound SMTP ports are blocked) or through an SMTP relay: an authenticated submission endpoint such as Cloudflare's (implicit TLS on port 465) or a plain Postfix relay over Tailscale. It is designed for use with Claude Code Routines for automated digest and alert emails.
 
 Reference implementation: [Shark-no-Kari](https://github.com/HaiNick/Shark-no-Kari)
 
@@ -69,12 +69,15 @@ Errors come back as results, not exceptions:
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `MAIL_FROM` | **yes** | | Sender address (envelope and `From` header). With Cloudflare Email Service it must be on an onboarded domain |
+| `TEGAMI_TRANSPORT` | no | `smtp` | `smtp`, or `cloudflare_api` to send through Cloudflare's `send_raw` REST endpoint over HTTPS. With `cloudflare_api` the `SMTP_*` settings except `SMTP_TIMEOUT_S` are ignored |
+| `TEGAMI_CF_ACCOUNT_ID` | with `cloudflare_api` | | 32-character Cloudflare account ID |
+| `TEGAMI_CF_API_TOKEN` | with `cloudflare_api` | | Cloudflare API token with **Email Sending: Edit**. `MAIL_FROM` must be on a domain onboarded to Email Sending |
 | `SMTP_HOST` | no | `localhost` | Relay hostname, for example `smtp.mx.cloudflare.net` |
 | `SMTP_TLS` | no | `none` | `none` (plain), `implicit` (TLS from connect, SMTPS), or `starttls` |
 | `SMTP_PORT` | no | `465` with `implicit`, else `25` | SMTP port |
 | `SMTP_USERNAME` | no | | SMTP `AUTH` user. Cloudflare: the literal string `api_token`. Requires `SMTP_TLS` other than `none` |
 | `SMTP_PASSWORD` | with `SMTP_USERNAME` | | SMTP `AUTH` password. Cloudflare: an API token with **Email Sending: Edit** |
-| `SMTP_TIMEOUT_S` | no | `30` | SMTP connect and command timeout, in seconds |
+| `SMTP_TIMEOUT_S` | no | `30` | Timeout for SMTP or the Cloudflare API request, in seconds |
 | `OIDC_ENABLED` | no | | Set `true` to enable OIDC auth (mutually exclusive with `MCP_API_KEY`) |
 | `OIDC_CONFIG_URL` | if OIDC | | OIDC discovery URL |
 | `OIDC_CLIENT_ID` | if OIDC | | OIDC client ID |
@@ -110,7 +113,11 @@ services:
     restart: unless-stopped
     environment:
       MAIL_FROM: alerts@example.com
-      # Cloudflare Email Service (authenticated submission, implicit TLS)
+      # Cloudflare Email Service over HTTPS (works where ports 25 and 465 are blocked)
+      TEGAMI_TRANSPORT: cloudflare_api
+      TEGAMI_CF_ACCOUNT_ID: ${CF_ACCOUNT_ID}
+      TEGAMI_CF_API_TOKEN: ${CF_EMAIL_TOKEN}
+      # Or Cloudflare over SMTP (authenticated submission, implicit TLS)
       SMTP_HOST: smtp.mx.cloudflare.net
       SMTP_TLS: implicit
       SMTP_USERNAME: api_token
