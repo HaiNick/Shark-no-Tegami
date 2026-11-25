@@ -3,7 +3,7 @@
 import hashlib
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from email.message import EmailMessage
 from email.utils import formatdate, make_msgid
@@ -23,11 +23,50 @@ PREVIEW_CHARS = 500
 _ADDR_RE = re.compile(r"^[^@\s<>,;\"]+@[^@\s<>,;\"]+$")
 
 
+SMTP_TLS_MODES = ("none", "implicit", "starttls")
+
+
 @dataclass(frozen=True)
 class Relay:
     mail_from: str
     host: str
     port: int
+    tls: str = "none"
+    username: str | None = None
+    password: str | None = field(default=None, repr=False)
+    timeout: float = 30.0
+
+    def send_kwargs(self) -> dict:
+        kw = {
+            "hostname": self.host,
+            "port": self.port,
+            "use_tls": self.tls == "implicit",
+            "start_tls": self.tls == "starttls",
+            "timeout": self.timeout,
+        }
+        if self.username:
+            kw["username"] = self.username
+            kw["password"] = self.password
+        return kw
+
+
+def relay_from_env(env) -> Relay:
+    """Build the relay from SMTP_* and MAIL_FROM. Raises RuntimeError on bad config."""
+    mail_from = env.get("MAIL_FROM", "")
+    if not mail_from:
+        raise RuntimeError("MAIL_FROM env var is required")
+    tls = env.get("SMTP_TLS", "none").strip().lower() or "none"
+    if tls not in SMTP_TLS_MODES:
+        raise RuntimeError(f"SMTP_TLS must be one of {', '.join(SMTP_TLS_MODES)}")
+    username = env.get("SMTP_USERNAME", "") or None
+    password = env.get("SMTP_PASSWORD", "") or None
+    if bool(username) != bool(password):
+        raise RuntimeError("set both SMTP_USERNAME and SMTP_PASSWORD, or neither")
+    if username and tls == "none":
+        raise RuntimeError("SMTP_USERNAME requires SMTP_TLS=implicit or starttls; refusing to send credentials in plain text")
+    port = int(env.get("SMTP_PORT", "") or (465 if tls == "implicit" else 25))
+    timeout = float(env.get("SMTP_TIMEOUT_S", "") or 30)
+    return Relay(mail_from, env.get("SMTP_HOST", "localhost"), port, tls, username, password, timeout)
 
 
 @dataclass(frozen=True)
@@ -145,14 +184,7 @@ async def _process(req, cfg, relay, meta, transport, sender) -> dict:
     else:
         msg = build_message(relay, to, cc, req.subject, rendered)
         try:
-            await sender(
-                msg,
-                hostname=relay.host,
-                port=relay.port,
-                recipients=to + cc + bcc,
-                use_tls=False,
-                start_tls=False,
-            )
+            await sender(msg, recipients=to + cc + bcc, **relay.send_kwargs())
         except (aiosmtplib.SMTPException, OSError, TimeoutError) as e:
             raise TegamiError("E_SMTP", f"relay error: {type(e).__name__}: {e}")
         result["message_id"] = msg["Message-ID"]

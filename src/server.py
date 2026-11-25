@@ -1,6 +1,6 @@
 """
 Shark-no-Tegami - Streamable HTTP transport for claude.ai
-Exposes a send_email tool so Claude can send emails via a Postfix relay over Tailscale.
+Exposes a send_email tool so Claude can send emails via an SMTP relay (Cloudflare Email Service, or Postfix over Tailscale).
 """
 
 import os
@@ -13,7 +13,7 @@ from fastmcp import FastMCP
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tegami.config import load_config  # noqa: E402
-from tegami.pipeline import Relay, Request, process  # noqa: E402
+from tegami.pipeline import Request, process, relay_from_env  # noqa: E402
 
 with open(Path(__file__).resolve().parent.parent / "pyproject.toml", "rb") as f:
     __version__ = tomllib.load(f)["project"]["version"]
@@ -56,17 +56,11 @@ if OIDC_ENABLED:
             f"OIDC_ENABLED=true but missing required vars: {', '.join(_missing)}"
         )
 
-SMTP_HOST = os.getenv("SMTP_HOST", "localhost")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "25"))
-MAIL_FROM = os.getenv("MAIL_FROM", "")
-if not MAIL_FROM:
-    raise RuntimeError("MAIL_FROM env var is required")
-
 TEGAMI = load_config()
-RELAY = Relay(mail_from=MAIL_FROM, host=SMTP_HOST, port=SMTP_PORT)
+RELAY = relay_from_env(os.environ)
 
 _INSTRUCTIONS = (
-    "Shark-no-Tegami is an email sending tool. Use it to send plain-text, HTML, or Markdown emails via a configured Postfix relay.\n\n"
+    "Shark-no-Tegami is an email sending tool. Use it to send plain-text, HTML, or Markdown emails via a configured SMTP relay.\n\n"
     "Tool:\n"
     "- send_email: Send an email to one or more recipients. Returns a JSON object.\n\n"
     "Body:\n"
@@ -132,7 +126,7 @@ async def send_email(
     dry_run: bool = False,
 ) -> dict:
     """
-    Send an email via the configured Postfix relay. Returns a JSON result; errors
+    Send an email via the configured SMTP relay. Returns a JSON result; errors
     come back as {"status": "error", "code": ...} rather than exceptions.
 
     Args:
@@ -194,6 +188,10 @@ if __name__ == "__main__":
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "8000"))
     logger.info(f"Starting Shark-no-Tegami v{__version__} on {host}:{port}")
+    logger.info(
+        "SMTP relay %s:%d tls=%s auth=%s from=%s",
+        RELAY.host, RELAY.port, RELAY.tls, "yes" if RELAY.username else "no", RELAY.mail_from,
+    )
     if OIDC_ENABLED:
         logger.info("OIDC authentication is ENABLED (Pocket ID)")
     elif API_KEY:

@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.3.1] - 2026-11-25
+
+### Authenticated SMTP with TLS (Cloudflare Email Service)
+
+- **New `SMTP_TLS`** (`none`, `implicit`, `starttls`), **`SMTP_USERNAME`**,
+  **`SMTP_PASSWORD`**, and **`SMTP_TIMEOUT_S`**. With `SMTP_TLS=implicit` the
+  port defaults to 465, which is what Cloudflare Email Service requires
+  (`smtp.mx.cloudflare.net`, user `api_token`, an API token as password).
+- **Defaults are unchanged** (`localhost:25`, no TLS, no AUTH), so existing
+  Postfix deployments keep working without config changes.
+- **Startup refuses unsafe or half-set config:** an unknown `SMTP_TLS`, a
+  username without a password (or the reverse), or credentials with
+  `SMTP_TLS=none`.
+- The password is excluded from the relay's `repr`, and the startup log line
+  shows host, port, TLS mode, whether AUTH is on, and the sender, never the
+  password.
+- Wording: the tool description says "SMTP relay" instead of "Postfix relay".
+  Reconnect the Claude.ai connector to see the new text.
+
 ## [0.3.0] - 2026-10-29
 
 ### Tegami v2: Markdown, `body_ref`, and content validation
